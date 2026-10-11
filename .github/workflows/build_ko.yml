@@ -1,0 +1,33 @@
+name: Build k4_driver.ko
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-aarch64-linux-gnu make bc libssl-dev libelf-dev flex bison wget xz-utils
+      - name: Download Kernel 4.14.86
+        run: |
+          wget -q https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.14.86.tar.xz
+          tar -xf linux-4.14.86.tar.xz
+      - name: Configure kernel
+        run: |
+          cd linux-4.14.86
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig -j$(nproc)
+          scripts/config --enable CONFIG_MODULES
+          scripts/config --enable CONFIG_MODULE_UNLOAD
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig -j$(nproc)
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare -j$(nproc)
+      - name: Build .ko
+        run: |
+          make -C linux-4.14.86 M=${{ github.workspace }} ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules -j$(nproc)
+          ls -lh k4_driver.ko
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: k4_driver_ko
+          path: k4_driver.ko
